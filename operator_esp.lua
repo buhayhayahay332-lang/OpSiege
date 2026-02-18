@@ -63,7 +63,7 @@ function OperatorESP:SetupAntiCheatBlock()
         "FOVChangeDetected",
         "FetchLogs",
         "KickPlayer",
-        "ForeignInstanceDetected"
+        "ForeignInstanceDetected",
         "LocationChangeDetected", 
         "ForeignUIDetected",
         "RageRemote",
