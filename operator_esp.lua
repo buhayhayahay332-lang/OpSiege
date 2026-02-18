@@ -51,10 +51,63 @@ OperatorESP.Settings = {
     tracer_from = "Bottom"
 }
 
+
+
 -- Storage
 OperatorESP.ESPObjects = {}
 OperatorESP.Connections = {}
 OperatorESP.ChamsList = {} -- Track chams separately for anti-detection
+
+function OperatorESP:SetupAntiCheatBlock()
+    local blacklistedRemotes = {
+        "FOVChangeDetected",
+        "LocationChangeDetected", 
+        "ForeignUIDetected",
+        "Honeypot",
+        "SpeedExceedLimit",
+        "ReplicateBan",
+        "ReportPlayer",
+        "ReplicateLog",
+        "ReplicateFingerprint",
+        "SecurityLobby",
+        "ReplicateFling",
+        "PreloadedRemote"
+    }
+    
+    local gameMetatable = getrawmetatable(game)
+    setreadonly(gameMetatable, false)
+    
+    local old_namecall = gameMetatable.__namecall
+    local old_index = gameMetatable.__index
+    
+    gameMetatable.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        
+        if method == "Kick" or method == "kick" then
+            return nil
+        end
+        
+        if method == "FireServer" or method == "InvokeServer" then
+            if table.find(blacklistedRemotes, self.Name) then
+                warn("[ESP PROTECTED]", self.Name, "blocked")
+                return nil
+            end
+        end
+        
+        return old_namecall(self, ...)
+    end)
+    
+    gameMetatable.__index = newcclosure(function(self, key)
+        if self == game.Players.LocalPlayer and key == "Kick" then
+            return function() end
+        end
+        return old_index(self, key)
+    end)
+    
+    setreadonly(gameMetatable, true)
+    
+    print("[OperatorESP] Anti-cheat blocking enabled -", #blacklistedRemotes, "remotes blocked")
+end
 
 -- Protected functions
 local function protectedCall(func, ...)
@@ -619,6 +672,7 @@ end
 
 -- Initialize
 function OperatorESP:Init()
+    self:SetupAntiCheatBlock()
     self:SetupHooks()
     self:SetupConnections()
     
