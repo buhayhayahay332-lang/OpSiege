@@ -1,5 +1,30 @@
--- Complete Operator ESP Module
+-- Maximum Bypassed ESP Module
 local OperatorESP = {}
+
+-- Anti-Detection: Clone references to avoid detection
+local cloneref = cloneref or function(obj) return obj end
+local clonefunc = clonefunc or function(func) return func end
+
+-- Clone all services
+local Players = cloneref(game:GetService("Players"))
+local RunService = cloneref(game:GetService("RunService"))
+local Workspace = cloneref(game:GetService("Workspace"))
+local Camera = Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- Store original metamethods
+local gameMetatable = getrawmetatable(game)
+local old_namecall = gameMetatable.__namecall
+local old_index = gameMetatable.__index
+local old_newindex = gameMetatable.__newindex
+
+-- Clone important functions
+local oldInstanceNew = clonefunc(Instance.new)
+local oldDrawingNew = clonefunc(Drawing.new)
+local oldFindFirstChild = clonefunc(game.FindFirstChild)
+local oldIsA = clonefunc(game.IsA)
+
+-- Settings
 OperatorESP.Settings = {
     enabled = true,
     team_check = true,
@@ -23,27 +48,23 @@ OperatorESP.Settings = {
     tracers_enabled = false,
     tracer_color = Color3.fromRGB(255, 255, 255),
     tracer_thickness = 1,
-    tracer_from = "Bottom" -- "Bottom", "Middle", "Top"
+    tracer_from = "Bottom"
 }
 
 -- Storage
 OperatorESP.ESPObjects = {}
 OperatorESP.Connections = {}
+OperatorESP.ChamsList = {} -- Track chams separately for anti-detection
 
--- Services
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
-local Camera = Workspace.CurrentCamera
-local LocalPlayer = Players.LocalPlayer
-
--- Store original functions
-local old_namecall
-local old_index
+-- Protected functions
+local function protectedCall(func, ...)
+    local success, result = pcall(func, ...)
+    return success and result or nil
+end
 
 -- Utility Functions
 local function IsAlive(player)
-    return player and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0
+    return player and player.Character and oldFindFirstChild(player.Character, "Humanoid") and player.Character.Humanoid.Health > 0
 end
 
 local function IsTeammate(player)
@@ -63,9 +84,9 @@ local function GetTeamColor(player)
     end
 end
 
--- Drawing Functions
+-- Drawing Functions (using cloned Drawing.new)
 local function CreateDrawing(type, properties)
-    local drawing = Drawing.new(type)
+    local drawing = oldDrawingNew(type)
     for prop, value in pairs(properties) do
         drawing[prop] = value
     end
@@ -101,7 +122,7 @@ function OperatorESP:CreateBoxESP(character)
 end
 
 function OperatorESP:UpdateBoxESP(character, drawings)
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    local rootPart = oldFindFirstChild(character, "HumanoidRootPart")
     if not rootPart then return end
     
     local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -117,22 +138,18 @@ function OperatorESP:UpdateBoxESP(character, drawings)
     local bottomRight = Camera:WorldToViewportPoint((bottomCFrame * CFrame.new(size.X / 2, 0, 0)).Position)
     
     if topLeft.Z > 0 then
-        -- Top line
         drawings.TopLeft.From = Vector2.new(topLeft.X, topLeft.Y)
         drawings.TopLeft.To = Vector2.new(topRight.X, topRight.Y)
         drawings.TopLeft.Visible = true
         
-        -- Right line
         drawings.TopRight.From = Vector2.new(topRight.X, topRight.Y)
         drawings.TopRight.To = Vector2.new(bottomRight.X, bottomRight.Y)
         drawings.TopRight.Visible = true
         
-        -- Bottom line
         drawings.BottomRight.From = Vector2.new(bottomRight.X, bottomRight.Y)
         drawings.BottomRight.To = Vector2.new(bottomLeft.X, bottomLeft.Y)
         drawings.BottomRight.Visible = true
         
-        -- Left line
         drawings.BottomLeft.From = Vector2.new(bottomLeft.X, bottomLeft.Y)
         drawings.BottomLeft.To = Vector2.new(topLeft.X, topLeft.Y)
         drawings.BottomLeft.Visible = true
@@ -176,8 +193,8 @@ end
 
 function OperatorESP:UpdateSkeletonESP(character, skeleton)
     for i, connection in ipairs(skeleton.connections) do
-        local part1 = character:FindFirstChild(connection[1])
-        local part2 = character:FindFirstChild(connection[2])
+        local part1 = oldFindFirstChild(character, connection[1])
+        local part2 = oldFindFirstChild(character, connection[2])
         
         if part1 and part2 then
             local pos1, onScreen1 = Camera:WorldToViewportPoint(part1.Position)
@@ -196,27 +213,48 @@ function OperatorESP:UpdateSkeletonESP(character, skeleton)
     end
 end
 
--- Chams Implementation
+-- MAXIMUM BYPASSED CHAMS IMPLEMENTATION
 function OperatorESP:CreateChams(character, player)
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "OperatorESP_Highlight"
-    highlight.FillColor = GetTeamColor(player)
-    highlight.OutlineColor = self.Settings.chams_outline_color
-    highlight.FillTransparency = self.Settings.chams_fill_transparency
-    highlight.OutlineTransparency = self.Settings.chams_outline_transparency
-    highlight.DepthMode = self.Settings.chams_always_on_top and Enum.HighlightDepthMode.AlwaysOnTop or Enum.HighlightDepthMode.Occluded
-    highlight.Parent = character
+    -- Use cloned Instance.new to avoid detection
+    local highlight = protectedCall(oldInstanceNew, "Highlight")
+    if not highlight then return nil end
+    
+    -- Randomize name to avoid detection patterns
+    local randomName = game:GetService("HttpService"):GenerateGUID(false):sub(1, 8)
+    highlight.Name = randomName
+    
+    -- Set properties using protected calls
+    protectedCall(function()
+        highlight.FillColor = GetTeamColor(player)
+        highlight.OutlineColor = self.Settings.chams_outline_color
+        highlight.FillTransparency = self.Settings.chams_fill_transparency
+        highlight.OutlineTransparency = self.Settings.chams_outline_transparency
+        highlight.DepthMode = self.Settings.chams_always_on_top and Enum.HighlightDepthMode.AlwaysOnTop or Enum.HighlightDepthMode.Occluded
+        highlight.Adornee = character
+    end)
+    
+    -- Parent to CoreGui instead of character for better hiding
+    local coreGui = cloneref(game:GetService("CoreGui"))
+    protectedCall(function()
+        highlight.Parent = coreGui
+    end)
+    
+    -- Track for cleanup
+    table.insert(self.ChamsList, highlight)
     
     return highlight
 end
 
 function OperatorESP:UpdateChams(character, highlight, player)
     if highlight and highlight.Parent then
-        highlight.FillColor = GetTeamColor(player)
-        highlight.OutlineColor = self.Settings.chams_outline_color
-        highlight.FillTransparency = self.Settings.chams_fill_transparency
-        highlight.OutlineTransparency = self.Settings.chams_outline_transparency
-        highlight.DepthMode = self.Settings.chams_always_on_top and Enum.HighlightDepthMode.AlwaysOnTop or Enum.HighlightDepthMode.Occluded
+        protectedCall(function()
+            highlight.FillColor = GetTeamColor(player)
+            highlight.OutlineColor = self.Settings.chams_outline_color
+            highlight.FillTransparency = self.Settings.chams_fill_transparency
+            highlight.OutlineTransparency = self.Settings.chams_outline_transparency
+            highlight.DepthMode = self.Settings.chams_always_on_top and Enum.HighlightDepthMode.AlwaysOnTop or Enum.HighlightDepthMode.Occluded
+            highlight.Adornee = character
+        end)
     end
 end
 
@@ -235,7 +273,7 @@ function OperatorESP:CreateNameESP(character, player)
 end
 
 function OperatorESP:UpdateNameESP(character, text, player)
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    local rootPart = oldFindFirstChild(character, "HumanoidRootPart")
     if not rootPart then return end
     
     local pos, onScreen = Camera:WorldToViewportPoint(rootPart.Position + Vector3.new(0, 3, 0))
@@ -268,7 +306,7 @@ function OperatorESP:CreateHealthBar(character)
 end
 
 function OperatorESP:UpdateHealthBar(character, healthBar)
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    local rootPart = oldFindFirstChild(character, "HumanoidRootPart")
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     if not rootPart or not humanoid then return end
     
@@ -307,7 +345,7 @@ function OperatorESP:CreateTracer(character)
 end
 
 function OperatorESP:UpdateTracer(character, line)
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    local rootPart = oldFindFirstChild(character, "HumanoidRootPart")
     if not rootPart then return end
     
     local pos, onScreen = Camera:WorldToViewportPoint(rootPart.Position)
@@ -318,7 +356,7 @@ function OperatorESP:UpdateTracer(character, line)
             fromPos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
         elseif self.Settings.tracer_from == "Top" then
             fromPos = Vector2.new(Camera.ViewportSize.X / 2, 0)
-        else -- Middle
+        else
             fromPos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
         end
         
@@ -345,8 +383,8 @@ function OperatorESP:CreateDistanceESP(character)
 end
 
 function OperatorESP:UpdateDistanceESP(character, text)
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    local localRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    local rootPart = oldFindFirstChild(character, "HumanoidRootPart")
+    local localRoot = LocalPlayer.Character and oldFindFirstChild(LocalPlayer.Character, "HumanoidRootPart")
     if not rootPart or not localRoot then return end
     
     local distance = (rootPart.Position - localRoot.Position).Magnitude
@@ -367,7 +405,6 @@ function OperatorESP:ApplyToCharacter(character, player)
     if player == LocalPlayer then return end
     if IsTeammate(player) and self.Settings.team_check then return end
     
-    -- Remove old ESP if exists
     self:RemoveESP(player)
     
     local espData = {
@@ -382,7 +419,6 @@ function OperatorESP:ApplyToCharacter(character, player)
         distance = nil
     }
     
-    -- Create ESP elements based on settings
     if self.Settings.enabled then
         espData.box = self:CreateBoxESP(character)
     end
@@ -422,37 +458,30 @@ function OperatorESP:UpdateESP()
             continue
         end
         
-        -- Update box
         if espData.box and self.Settings.enabled then
             self:UpdateBoxESP(espData.character, espData.box)
         end
         
-        -- Update skeleton
         if espData.skeleton and self.Settings.skeleton_enabled then
             self:UpdateSkeletonESP(espData.character, espData.skeleton)
         end
         
-        -- Update chams
         if espData.chams and self.Settings.chams_enabled then
             self:UpdateChams(espData.character, espData.chams, player)
         end
         
-        -- Update name
         if espData.name and self.Settings.name_enabled then
             self:UpdateNameESP(espData.character, espData.name, player)
         end
         
-        -- Update health bar
         if espData.healthBar and self.Settings.health_bar_enabled then
             self:UpdateHealthBar(espData.character, espData.healthBar)
         end
         
-        -- Update tracer
         if espData.tracer and self.Settings.tracers_enabled then
             self:UpdateTracer(espData.character, espData.tracer)
         end
         
-        -- Update distance
         if espData.distance and self.Settings.distance_enabled then
             self:UpdateDistanceESP(espData.character, espData.distance)
         end
@@ -464,67 +493,79 @@ function OperatorESP:RemoveESP(player)
     local espData = self.ESPObjects[player]
     if not espData then return end
     
-    -- Remove box
     if espData.box then
         for _, drawing in pairs(espData.box) do
-            drawing:Remove()
+            pcall(function() drawing:Remove() end)
         end
     end
     
-    -- Remove skeleton
     if espData.skeleton then
         for _, line in pairs(espData.skeleton.lines) do
-            line:Remove()
+            pcall(function() line:Remove() end)
         end
     end
     
-    -- Remove chams
     if espData.chams then
-        espData.chams:Destroy()
+        pcall(function() espData.chams:Destroy() end)
     end
     
-    -- Remove name
     if espData.name then
-        espData.name:Remove()
+        pcall(function() espData.name:Remove() end)
     end
     
-    -- Remove health bar
     if espData.healthBar then
-        espData.healthBar.outline:Remove()
-        espData.healthBar.bar:Remove()
+        pcall(function() espData.healthBar.outline:Remove() end)
+        pcall(function() espData.healthBar.bar:Remove() end)
     end
     
-    -- Remove tracer
     if espData.tracer then
-        espData.tracer:Remove()
+        pcall(function() espData.tracer:Remove() end)
     end
     
-    -- Remove distance
     if espData.distance then
-        espData.distance:Remove()
+        pcall(function() espData.distance:Remove() end)
     end
     
     self.ESPObjects[player] = nil
 end
 
--- Hooks Setup
+-- MAXIMUM BYPASSED HOOKS
 function OperatorESP:SetupHooks()
-    -- Hook __namecall
-    old_namecall = hookmetamethod(game, "__namecall", function(self, ...)
+    setreadonly(gameMetatable, false)
+    
+    -- Hook __namecall with anti-detection
+    gameMetatable.__namecall = newcclosure(function(self, ...)
         local method = getnamecallmethod()
         local args = {...}
         
-        -- You can intercept specific methods here if needed
+        -- Block certain anti-cheat methods
+        if method == "Kick" or method == "kick" then
+            return nil
+        end
+        
+        -- Hide Highlight instances from detection
+        if method == "GetChildren" or method == "GetDescendants" then
+            local result = old_namecall(self, ...)
+            local filtered = {}
+            
+            for _, v in pairs(result) do
+                if not (oldIsA(v, "Highlight") and table.find(OperatorESP.ChamsList, v)) then
+                    table.insert(filtered, v)
+                end
+            end
+            
+            return filtered
+        end
         
         return old_namecall(self, ...)
     end)
     
-    -- Hook __index
-    old_index = hookmetamethod(game, "__index", function(self, key)
+    -- Hook __index with anti-detection
+    gameMetatable.__index = newcclosure(function(self, key)
         local result = old_index(self, key)
         
-        -- Automatically apply ESP when Character property is accessed
-        if self:IsA("Player") and key == "Character" and result then
+        -- Automatically apply ESP when Character is accessed
+        if oldIsA(self, "Player") and key == "Character" and result then
             task.defer(function()
                 if OperatorESP.Settings.enabled and not OperatorESP.ESPObjects[self] then
                     OperatorESP:ApplyToCharacter(result, self)
@@ -534,16 +575,29 @@ function OperatorESP:SetupHooks()
         
         return result
     end)
+    
+    -- Hook __newindex to block property changes to our objects
+    gameMetatable.__newindex = newcclosure(function(self, key, value)
+        -- Protect our highlight instances
+        if oldIsA(self, "Highlight") and table.find(OperatorESP.ChamsList, self) then
+            if key == "Parent" and value == nil then
+                return nil -- Block destruction
+            end
+        end
+        
+        return old_newindex(self, key, value)
+    end)
+    
+    setreadonly(gameMetatable, true)
 end
 
 -- Event Connections
 function OperatorESP:SetupConnections()
-    -- Player added
     table.insert(self.Connections, Players.PlayerAdded:Connect(function(player)
         if player == LocalPlayer then return end
         
         player.CharacterAdded:Connect(function(character)
-            task.wait(0.1) -- Wait for character to fully load
+            task.wait(0.1)
             if IsAlive(player) then
                 self:ApplyToCharacter(character, player)
             end
@@ -554,12 +608,10 @@ function OperatorESP:SetupConnections()
         end
     end))
     
-    -- Player removing
     table.insert(self.Connections, Players.PlayerRemoving:Connect(function(player)
         self:RemoveESP(player)
     end))
     
-    -- Update loop
     table.insert(self.Connections, RunService.RenderStepped:Connect(function()
         self:UpdateESP()
     end))
@@ -567,46 +619,43 @@ end
 
 -- Initialize
 function OperatorESP:Init()
-    -- Setup hooks
     self:SetupHooks()
-    
-    -- Setup connections
     self:SetupConnections()
     
-    -- Apply to existing players
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             self:ApplyToCharacter(player.Character, player)
         end
     end
     
-    print("[OperatorESP] Initialized successfully!")
+    print("[OperatorESP] Bypassed initialization complete!")
 end
 
 -- Cleanup
 function OperatorESP:Destroy()
-    -- Disconnect all connections
     for _, connection in pairs(self.Connections) do
         connection:Disconnect()
     end
     
-    -- Remove all ESP
     for player, _ in pairs(self.ESPObjects) do
         self:RemoveESP(player)
     end
     
-    -- Restore hooks
-    if old_namecall then
-        hookmetamethod(game, "__namecall", old_namecall)
-    end
-    if old_index then
-        hookmetamethod(game, "__index", old_index)
+    -- Clean up all chams
+    for _, highlight in pairs(self.ChamsList) do
+        pcall(function() highlight:Destroy() end)
     end
     
-    print("[OperatorESP] Destroyed successfully!")
+    setreadonly(gameMetatable, false)
+    gameMetatable.__namecall = old_namecall
+    gameMetatable.__index = old_index
+    gameMetatable.__newindex = old_newindex
+    setreadonly(gameMetatable, true)
+    
+    print("[OperatorESP] Destroyed!")
 end
 
--- Toggle functions for easy UI integration
+-- Toggle functions
 function OperatorESP:ToggleESP(enabled)
     self.Settings.enabled = enabled
     if not enabled then
@@ -635,19 +684,53 @@ end
 
 function OperatorESP:ToggleChams(enabled)
     self.Settings.chams_enabled = enabled
-    if not enabled then
-        for player, espData in pairs(self.ESPObjects) do
-            if espData.chams then
-                espData.chams.Enabled = false
-            end
-        end
-    else
-        for player, espData in pairs(self.ESPObjects) do
-            if espData.chams then
-                espData.chams.Enabled = true
-            end
+    for player, espData in pairs(self.ESPObjects) do
+        if espData.chams then
+            espData.chams.Enabled = enabled
         end
     end
 end
 
 return OperatorESP
+
+
+--[[
+-- Box ESP
+ESP.Settings.enabled = true
+ESP.Settings.box_color = Color3.fromRGB(255, 0, 0)
+ESP.Settings.box_thickness = 2
+
+-- Team Check (applies to box, skeleton, and chams)
+ESP.Settings.team_check = true
+
+-- Skeleton ESP
+ESP.Settings.skeleton_enabled = true
+ESP.Settings.skeleton_color = Color3.fromRGB(255, 255, 255)
+ESP.Settings.skeleton_thickness = 1
+
+-- Chams (Highlight) ESP
+ESP.Settings.chams_enabled = true
+ESP.Settings.chams_team_check = true
+ESP.Settings.chams_enemy_color = Color3.fromRGB(255, 80, 80)
+ESP.Settings.chams_team_color = Color3.fromRGB(80, 160, 255)
+ESP.Settings.chams_fill_transparency = 0.5
+ESP.Settings.chams_outline_color = Color3.fromRGB(255, 255, 255)
+ESP.Settings.chams_outline_transparency = 0
+ESP.Settings.chams_always_on_top = true
+
+-- Name ESP
+ESP.Settings.name_enabled = false
+ESP.Settings.name_color = Color3.fromRGB(255, 255, 255)
+
+-- Distance ESP
+ESP.Settings.distance_enabled = false
+
+-- Health Bar ESP
+ESP.Settings.health_bar_enabled = false
+
+-- Tracers ESP
+ESP.Settings.tracers_enabled = false
+ESP.Settings.tracer_color = Color3.fromRGB(255, 255, 255)
+ESP.Settings.tracer_thickness = 1
+ESP.Settings.tracer_from = "Bottom" -- Options: "Bottom", "Middle", "Top"
+]]
