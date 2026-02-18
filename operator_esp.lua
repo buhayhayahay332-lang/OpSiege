@@ -61,6 +61,7 @@ OperatorESP.ChamsList = {} -- Track chams separately for anti-detection
 function OperatorESP:SetupAntiCheatBlock()
     local blacklistedRemotes = {
         "FOVChangeDetected",
+        "DBNO",
         "FetchLogs",
         "KickPlayer",
         "ForeignInstanceDetected",
