@@ -72,7 +72,7 @@ function OperatorESP:SetupAntiCheatBlock()
         "ReplicateBan",
         "ReportPlayer",
         "ReplicateLog",
-        "ReplicateFlag"
+        "ReplicateFlag",
         "ReplicateFingerprint",
         "SecurityLobby",
         "ReplicateFling",
