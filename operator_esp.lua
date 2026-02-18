@@ -65,18 +65,14 @@ function OperatorESP:SetupAntiCheatBlock()
         "FetchLogs",
         "KickPlayer",
         "ForeignInstanceDetected",
-        "LocationChangeDetected", 
         "ForeignUIDetected",
         "RageRemote",
-        "Honeypot",
         "SpeedExceedLimit",
         "ReplicateBan",
         "ReportPlayer",
         "ReplicateLog",
         "ReplicateFlag",
         "ReplicateFingerprint",
-        "SecurityLobby",
-        "ReplicateFling",
         "PreloadedRemote",
         "UnknownHighlight"
     }
@@ -91,7 +87,8 @@ function OperatorESP:SetupAntiCheatBlock()
         local method = getnamecallmethod()
         
         if method == "Kick" or method == "kick" then
-            return nil
+                 warn("TRIED TO KICK")
+            return 
         end
         
         if method == "FireServer" or method == "InvokeServer" then
