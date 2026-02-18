@@ -71,7 +71,8 @@ function OperatorESP:SetupAntiCheatBlock()
         "ReplicateFingerprint",
         "SecurityLobby",
         "ReplicateFling",
-        "PreloadedRemote"
+        "PreloadedRemote",
+        "UnknownHighlight"
     }
     
     local gameMetatable = getrawmetatable(game)
