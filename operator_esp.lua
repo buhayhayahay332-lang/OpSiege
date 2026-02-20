@@ -1,24 +1,19 @@
--- Maximum Bypassed ESP Module
 local OperatorESP = {}
 
--- Anti-Detection: Clone references to avoid detection
 local cloneref = cloneref or function(obj) return obj end
 local clonefunc = clonefunc or function(func) return func end
 
--- Clone all services
 local Players = cloneref(game:GetService("Players"))
 local RunService = cloneref(game:GetService("RunService"))
 local Workspace = cloneref(game:GetService("Workspace"))
 local Camera = Workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
--- Store original metamethods
 local gameMetatable = getrawmetatable(game)
 local old_namecall = gameMetatable.__namecall
 local old_index = gameMetatable.__index
 local old_newindex = gameMetatable.__newindex
 
--- Clone important functions
 local oldInstanceNew = clonefunc(Instance.new)
 local oldDrawingNew = clonefunc(Drawing.new)
 local oldFindFirstChild = clonefunc(game.FindFirstChild)
@@ -56,8 +51,10 @@ OperatorESP.Settings = {
 -- Storage
 OperatorESP.ESPObjects = {}
 OperatorESP.Connections = {}
-OperatorESP.ChamsList = {} -- Track chams separately for anti-detection
+OperatorESP.ChamsList = {} 
 
+--[[
+-- idk im trippin
 function OperatorESP:SetupAntiCheatBlock()
     local blacklistedRemotes = {
         "FOVChangeDetected",
@@ -113,13 +110,13 @@ function OperatorESP:SetupAntiCheatBlock()
     print("[OperatorESP] Anti-cheat blocking enabled -", #blacklistedRemotes, "remotes blocked")
 end
 
--- Protected functions
+]]
+
 local function protectedCall(func, ...)
     local success, result = pcall(func, ...)
     return success and result or nil
 end
 
--- Utility Functions
 local function IsAlive(player)
     return player and player.Character and oldFindFirstChild(player.Character, "Humanoid") and player.Character.Humanoid.Health > 0
 end
@@ -141,7 +138,6 @@ local function GetTeamColor(player)
     end
 end
 
--- Drawing Functions (using cloned Drawing.new)
 local function CreateDrawing(type, properties)
     local drawing = oldDrawingNew(type)
     for prop, value in pairs(properties) do
@@ -150,7 +146,6 @@ local function CreateDrawing(type, properties)
     return drawing
 end
 
--- Box ESP Implementation
 function OperatorESP:CreateBoxESP(character)
     local drawings = {
         TopLeft = CreateDrawing("Line", {
@@ -217,7 +212,6 @@ function OperatorESP:UpdateBoxESP(character, drawings)
     end
 end
 
--- Skeleton ESP Implementation
 function OperatorESP:CreateSkeletonESP(character)
     local lines = {}
     local connections = {
@@ -270,17 +264,13 @@ function OperatorESP:UpdateSkeletonESP(character, skeleton)
     end
 end
 
--- MAXIMUM BYPASSED CHAMS IMPLEMENTATION
 function OperatorESP:CreateChams(character, player)
-    -- Use cloned Instance.new to avoid detection
     local highlight = protectedCall(oldInstanceNew, "Highlight")
     if not highlight then return nil end
     
-    -- Randomize name to avoid detection patterns
     local randomName = game:GetService("HttpService"):GenerateGUID(false):sub(1, 8)
     highlight.Name = randomName
     
-    -- Set properties using protected calls
     protectedCall(function()
         highlight.FillColor = GetTeamColor(player)
         highlight.OutlineColor = self.Settings.chams_outline_color
@@ -290,13 +280,11 @@ function OperatorESP:CreateChams(character, player)
         highlight.Adornee = character
     end)
     
-    -- Parent to CoreGui instead of character for better hiding
     local coreGui = cloneref(game:GetService("CoreGui"))
     protectedCall(function()
         highlight.Parent = coreGui
     end)
     
-    -- Track for cleanup
     table.insert(self.ChamsList, highlight)
     
     return highlight
@@ -315,7 +303,6 @@ function OperatorESP:UpdateChams(character, highlight, player)
     end
 end
 
--- Name ESP Implementation
 function OperatorESP:CreateNameESP(character, player)
     local text = CreateDrawing("Text", {
         Text = player.Name,
@@ -343,7 +330,6 @@ function OperatorESP:UpdateNameESP(character, text, player)
     end
 end
 
--- Health Bar Implementation
 function OperatorESP:CreateHealthBar(character)
     local outline = CreateDrawing("Square", {
         Thickness = 1,
@@ -425,7 +411,6 @@ function OperatorESP:UpdateTracer(character, line)
     end
 end
 
--- Distance ESP Implementation
 function OperatorESP:CreateDistanceESP(character)
     local text = CreateDrawing("Text", {
         Text = "",
@@ -456,7 +441,6 @@ function OperatorESP:UpdateDistanceESP(character, text)
     end
 end
 
--- Main ESP Application
 function OperatorESP:ApplyToCharacter(character, player)
     if not character or not player then return end
     if player == LocalPlayer then return end
@@ -507,7 +491,6 @@ function OperatorESP:ApplyToCharacter(character, player)
     self.ESPObjects[player] = espData
 end
 
--- Update ESP
 function OperatorESP:UpdateESP()
     for player, espData in pairs(self.ESPObjects) do
         if not IsAlive(player) or not espData.character or not espData.character.Parent then
@@ -545,7 +528,6 @@ function OperatorESP:UpdateESP()
     end
 end
 
--- Remove ESP
 function OperatorESP:RemoveESP(player)
     local espData = self.ESPObjects[player]
     if not espData then return end
@@ -586,21 +568,17 @@ function OperatorESP:RemoveESP(player)
     self.ESPObjects[player] = nil
 end
 
--- MAXIMUM BYPASSED HOOKS
 function OperatorESP:SetupHooks()
     setreadonly(gameMetatable, false)
     
-    -- Hook __namecall with anti-detection
     gameMetatable.__namecall = newcclosure(function(self, ...)
         local method = getnamecallmethod()
         local args = {...}
         
-        -- Block certain anti-cheat methods
         if method == "Kick" or method == "kick" then
             return nil
         end
         
-        -- Hide Highlight instances from detection
         if method == "GetChildren" or method == "GetDescendants" then
             local result = old_namecall(self, ...)
             local filtered = {}
@@ -617,11 +595,9 @@ function OperatorESP:SetupHooks()
         return old_namecall(self, ...)
     end)
     
-    -- Hook __index with anti-detection
     gameMetatable.__index = newcclosure(function(self, key)
         local result = old_index(self, key)
         
-        -- Automatically apply ESP when Character is accessed
         if oldIsA(self, "Player") and key == "Character" and result then
             task.defer(function()
                 if OperatorESP.Settings.enabled and not OperatorESP.ESPObjects[self] then
@@ -633,12 +609,10 @@ function OperatorESP:SetupHooks()
         return result
     end)
     
-    -- Hook __newindex to block property changes to our objects
     gameMetatable.__newindex = newcclosure(function(self, key, value)
-        -- Protect our highlight instances
         if oldIsA(self, "Highlight") and table.find(OperatorESP.ChamsList, self) then
             if key == "Parent" and value == nil then
-                return nil -- Block destruction
+                return nil 
             end
         end
         
@@ -648,7 +622,6 @@ function OperatorESP:SetupHooks()
     setreadonly(gameMetatable, true)
 end
 
--- Event Connections
 function OperatorESP:SetupConnections()
     table.insert(self.Connections, Players.PlayerAdded:Connect(function(player)
         if player == LocalPlayer then return end
@@ -674,9 +647,8 @@ function OperatorESP:SetupConnections()
     end))
 end
 
--- Initialize
 function OperatorESP:Init()
-    self:SetupAntiCheatBlock()
+    -- self:SetupAntiCheatBlock()
     self:SetupHooks()
     self:SetupConnections()
     
@@ -689,7 +661,6 @@ function OperatorESP:Init()
     print("[OperatorESP] Bypassed initialization complete!")
 end
 
--- Cleanup
 function OperatorESP:Destroy()
     for _, connection in pairs(self.Connections) do
         connection:Disconnect()
@@ -699,7 +670,6 @@ function OperatorESP:Destroy()
         self:RemoveESP(player)
     end
     
-    -- Clean up all chams
     for _, highlight in pairs(self.ChamsList) do
         pcall(function() highlight:Destroy() end)
     end
@@ -713,7 +683,6 @@ function OperatorESP:Destroy()
     print("[OperatorESP] Destroyed!")
 end
 
--- Toggle functions
 function OperatorESP:ToggleESP(enabled)
     self.Settings.enabled = enabled
     if not enabled then
